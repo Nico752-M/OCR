@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>OPERADOR - Captura OCR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        .input-orion {
+            width: 100%;
+            padding: 0.375rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.25rem;
+            font-size: 11px;
+            outline: none;
+            background-color: #f8fafc;
+            font-weight: 600;
+            color: #1f2937;
+            text-transform: uppercase;
+        }
+        .input-orion:focus {
+            ring: 1px solid #3b82f6;
+            border-color: #3b82f6;
+        }
+        .lbl-orion {
+            display: block;
+            font-size: 9px;
+            font-weight: 700;
+            color: #1e3a8a;
+            text-transform: uppercase;
+            margin-bottom: 0.125rem;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 0.75rem 0;
+            font-size: 0.75rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.2s;
+            border-bottom-width: 4px;
+            border-bottom-style: solid;
+        }
+        .tab-active {
+            border-bottom-color: #3b82f6;
+            color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .tab-inactive {
+            border-bottom-color: transparent;
+            color: #9ca3af;
+            background-color: white;
+        }
+        .documento-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 1rem;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 1rem;
+        }
+        .cara-documento {
+            border: 2px dashed #cbd5e1;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f8fafc;
+        }
+        .cara-documento:hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+        .cara-documento-activa {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+        .toast {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            z-index: 50;
+            transition: all 0.3s;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+    <!-- Toast -->
+    <div id="toast" class="toast hidden">Mensaje</div>
+
+    <header class="bg-blue-800 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="flex justify-between items-center max-w-5xl mx-auto">
+            <div class="flex items-center gap-3">
+                <span class="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">📸 OPERADOR</span>
+                <h1 class="font-black text-xl italic tracking-tighter">ML SOCETY <span class="text-blue-300 font-light">OCR</span></h1>
+            </div>
+            <div class="flex gap-2">
+                <span id="connection-status" class="text-[8px] bg-green-600 px-2 py-1 rounded-full">🟢 ONLINE</span>
+                <button onclick="reiniciarCaptura()" class="text-[10px] bg-blue-600 px-3 py-1 rounded-full font-bold uppercase">
+                    Nueva Captura
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="flex sticky top-[64px] z-40 shadow-sm border-b border-gray-200 bg-white">
+        <button id="btn-tab1" onclick="switchTab(1)" class="tab-btn tab-active">1. TOMAR FOTOS</button>
+        <button id="btn-tab2" onclick="switchTab(2)" class="tab-btn tab-inactive">2. EDITAR VEHÍCULO</button>
+        <button id="btn-tab3" onclick="switchTab(3)" class="tab-btn tab-inactive">3. EDITAR PERSONA</button>
+    </nav>
+
+    <main class="max-w-5xl mx-auto p-4 pb-24">
+        <!-- TAB 1: Captura de fotos (ANVERSO Y REVERSO) -->
+        <div id="tab1" class="space-y-4">
+            <!-- TARJETA DE PROPIEDAD -->
+            <div class="documento-card">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-blue-600 text-xl">📄</span>
+                    <h2 class="text-blue-900 font-black text-xs uppercase">Tarjeta de Propiedad</h2>
+                </div>
+                
+                <!-- Anverso -->
+                <div class="cara-documento relative" id="propiedad-anverso-container" onclick="document.getElementById('propiedad-anverso').click()">
+                    <div id="propiedad-anverso-txt" class="text-center">
+                        <span class="text-2xl block mb-2">📸</span>
+                        <span class="text-xs font-bold text-blue-800 uppercase">ANVERSO</span>
+                        <span class="text-[8px] text-gray-600 block mt-1">Toca para tomar foto</span>
+                    </div>
+                    <img id="propiedad-anverso-img" class="hidden w-full h-32 object-cover rounded-lg" />
+                    <input type="file" accept="image/*" capture="environment" class="hidden" id="propiedad-anverso" onchange="procesarFoto(this, 'propiedad-anverso-img', 'propiedad-anverso-txt', 'propiedad', 'anverso')" />
+                    <span class="absolute top-2 right-2 text-[8px] bg-blue-100 px-2 py-1 rounded-full">ANVERSO</span>
+                </div>
+                
+                <!-- Reverso -->
+                <div class="cara-documento relative" id="propiedad-reverso-container" onclick="document.getElementById('propiedad-reverso').click()">
+                    <div id="propiedad-reverso-txt" class="text-center">
+                        <span class="text-2xl block mb-2">📸</span>
+                        <span class="text-xs font-bold text-blue-800 uppercase">REVERSO</span>
+                        <span class="text-[8px] text-gray-600 block mt-1">Toca para tomar foto</span>
+                    </div>
+                    <img id="propiedad-reverso-img" class="hidden w-full h-32 object-cover rounded-lg" />
+                    <input type="file" accept="image/*" capture="environment" class="hidden" id="propiedad-reverso" onchange="procesarFoto(this, 'propiedad-reverso-img', 'propiedad-reverso-txt', 'propiedad', 'reverso')" />
+                    <span class="absolute top-2 right-2 text-[8px] bg-gray-100 px-2 py-1 rounded-full">REVERSO</span>
+                </div>
+            </div>
+
+            <!-- CÉDULA -->
+            <div class="documento-card">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-blue-600 text-xl">🆔</span>
+                    <h2 class="text-blue-900 font-black text-xs uppercase">Cédula de Ciudadanía</h2>
+                </div>
+                
+                <!-- Anverso -->
+                <div class="cara-documento relative" id="cedula-anverso-container" onclick="document.getElementById('cedula-anverso').click()">
+                    <div id="cedula-anverso-txt" class="text-center">
+                        <span class="text-2xl block mb-2">📸</span>
+                        <span class="text-xs font-bold text-blue-800 uppercase">ANVERSO (Foto y datos)</span>
+                    </div>
+                    <img id="cedula-anverso-img" class="hidden w-full h-32 object-cover rounded-lg" />
+                    <input type="file" accept="image/*" capture="environment" class="hidden" id="cedula-anverso" onchange="procesarFoto(this, 'cedula-anverso-img', 'cedula-anverso-txt', 'cedula', 'anverso')" />
+                </div>
+                
+                <!-- Reverso -->
+                <div class="cara-documento relative" id="cedula-reverso-container" onclick="document.getElementById('cedula-reverso').click()">
+                    <div id="cedula-reverso-txt" class="text-center">
+                        <span class="text-2xl block mb-2">📸</span>
+                        <span class="text-xs font-bold text-blue-800 uppercase">REVERSO (Lugar y fecha)</span>
+                    </div>
+                    <img id="cedula-reverso-img" class="hidden w-full h-32 object-cover rounded-lg" />
+                    <input type="file" accept="image/*" capture="environment" class="hidden" id="cedula-reverso" onchange="procesarFoto(this, 'cedula-reverso-img', 'cedula-reverso-txt', 'cedula', 'reverso')" />
+                </div>
+            </div>
+
+            <!-- LICENCIA DE CONDUCCIÓN -->
+            <div class="documento-card">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-blue-600 text-xl">🚗</span>
+                    <h2 class="text-blue-900 font-black text-xs uppercase">Licencia de Conducción</h2>
+                </div>
+                
+                <!-- Anverso -->
+                <div class="cara-documento relative" id="licencia-anverso-container" onclick="document.getElementById('licencia-anverso').click()">
+                    <div id="licencia-anverso-txt" class="text-center">
+                        <span class="text-2xl block mb-2">📸</span>
+                        <span class="text-xs font-bold text-blue-800 uppercase">ANVERSO</span>
+                    </div>
+                    <img id="licencia-anverso-img" class="hidden w-full h-32 object-cover rounded-lg" />
+                    <input type="file" accept="image/*" capture="environment" class="hidden" id="licencia-anverso" onchange="procesarFoto(this, 'licencia-anverso-img', 'licencia-anverso-txt', 'licencia', 'anverso')" />
+                </div>
+                
+                <!-- Reverso -->
+                <div class="cara-documento relative" id="licencia-reverso-container" onclick="document.getElementById('licencia-reverso').click()">
+                    <div id="licencia-reverso-txt" class="text-center">
+                        <span class="text-2xl block mb-2">📸</span>
+                        <span class="text-xs font-bold text-blue-800 uppercase">REVERSO (Categorías)</span>
+                    </div>
+                    <img id="licencia-reverso-img" class="hidden w-full h-32 object-cover rounded-lg" />
+                    <input type="file" accept="image/*" capture="environment" class="hidden" id="licencia-reverso" onchange="procesarFoto(this, 'licencia-reverso-img', 'licencia-reverso-txt', 'licencia', 'reverso')" />
+                </div>
+            </div>
+
+            <!-- Barra de progreso OCR -->
+            <div id="ocr-progress" class="hidden bg-white p-4 rounded-xl">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-[10px] font-bold text-blue-600">PROCESANDO OCR...</span>
+                    <span id="ocr-status" class="text-[8px] bg-blue-100 px-2 py-1 rounded-full">ESPERANDO</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="ocr-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div id="ocr-detalle" class="text-[8px] text-gray-500 mt-2 text-center"></div>
+            </div>
+
+            <button onclick="irATabVehiculo()" class="w-full bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg">
+                CONTINUAR A EDICIÓN →
+            </button>
+            
+            <div class="text-center text-[10px] text-gray-500">
+                <span class="bg-gray-100 px-2 py-1 rounded">📍 Toma anverso y reverso de cada documento</span>
+            </div>
+        </div>
+
+        <!-- TAB 2: Datos del Vehículo (EDITABLE) -->
+        <div id="tab2" class="hidden space-y-4">
+            <div class="bg-white p-4 rounded-xl shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-red-700 font-black text-[11px] uppercase">Datos del Vehículo</h2>
+                    <span class="text-[8px] bg-yellow-100 px-2 py-1 rounded-full">✏️ MODO EDICIÓN</span>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="col-span-2 md:col-span-1">
+                        <label class="lbl-orion">Placa *</label>
+                        <input type="text" id="placa" class="input-orion border-blue-400" placeholder="ABC123">
+                    </div>
+                    <div><label class="lbl-orion">Marca</label><input type="text" id="marca" class="input-orion"></div>
+                    <div><label class="lbl-orion">Línea</label><input type="text" id="linea" class="input-orion"></div>
+                    <div><label class="lbl-orion">Clase</label><input type="text" id="clase" class="input-orion"></div>
+                    <div><label class="lbl-orion">Servicio</label>
+                        <select id="servicio" class="input-orion">
+                            <option value="PARTICULAR">PARTICULAR</option>
+                            <option value="PUBLICO">PÚBLICO</option>
+                        </select>
+                    </div>
+                    <div><label class="lbl-orion">No. Licencia</label><input type="text" id="licencia" class="input-orion"></div>
+                    <div><label class="lbl-orion">Cilindraje</label><input type="text" id="cilindraje" class="input-orion"></div>
+                    <div><label class="lbl-orion">Modelo</label><input type="text" id="modelo" class="input-orion"></div>
+                    <div class="col-span-2"><label class="lbl-orion">Número VIN</label><input type="text" id="vin" class="input-orion"></div>
+                    <div class="col-span-2"><label class="lbl-orion">Número Motor</label><input type="text" id="motor" class="input-orion"></div>
+                    <div><label class="lbl-orion">No. Ejes</label><input type="text" id="ejes" class="input-orion" value="2"></div>
+                    <div><label class="lbl-orion">Combustible</label><input type="text" id="combustible" class="input-orion"></div>
+                    <div class="col-span-2"><label class="lbl-orion">Chasis</label><input type="text" id="chasis" class="input-orion"></div>
+                    <div><label class="lbl-orion">Ref Llanta</label><input type="text" id="llanta" class="input-orion"></div>
+                    <div><label class="lbl-orion">País</label><input type="text" id="pais" class="input-orion" value="COLOMBIA"></div>
+                    <div><label class="lbl-orion">Departamento</label><input type="text" id="departamento" class="input-orion"></div>
+                    <div><label class="lbl-orion">Ciudad</label><input type="text" id="ciudad" class="input-orion"></div>
+                    <div><label class="lbl-orion">Matrícula</label><input type="date" id="matricula" class="input-orion"></div>
+                    <div><label class="lbl-orion">Color</label><input type="text" id="color" class="input-orion"></div>
+                    <div><label class="lbl-orion">Kilometraje</label><input type="text" id="kilometraje" class="input-orion"></div>
+                    <div><label class="lbl-orion">Potencia</label><input type="text" id="potencia" class="input-orion"></div>
+                    <div><label class="lbl-orion">Tipo Motor</label><input type="text" id="tipoMotor" class="input-orion"></div>
+                    <div><label class="lbl-orion">Carrocería</label><input type="text" id="carroceria" class="input-orion"></div>
+                    <div><label class="lbl-orion">No. Pax</label><input type="text" id="pax" class="input-orion" value="5"></div>
+                    <div><label class="lbl-orion">Blindado</label>
+                        <select id="blindado" class="input-orion">
+                            <option value="NO">NO</option>
+                            <option value="SI">SÍ</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex gap-2">
+                <button onclick="switchTab(1)" class="flex-1 bg-gray-600 text-white py-4 rounded-xl">← Volver a Fotos</button>
+                <button onclick="switchTab(3)" class="flex-1 bg-blue-700 text-white py-4 rounded-xl">Siguiente →</button>
+            </div>
+        </div>
+
+        <!-- TAB 3: Datos de la Persona (EDITABLE) -->
+        <div id="tab3" class="hidden space-y-4">
+            <div class="bg-white p-4 rounded-xl shadow-sm">
+                <h2 class="text-red-700 font-black text-[11px] mb-4 uppercase">Datos Personales</h2>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="col-span-2"><label class="lbl-orion">Nombres</label><input type="text" id="nombres" class="input-orion"></div>
+                    <div class="col-span-2"><label class="lbl-orion">Apellidos</label><input type="text" id="apellidos" class="input-orion"></div>
+                    <div><label class="lbl-orion">Tipo Doc</label>
+                        <select id="tipoDoc" class="input-orion">
+                            <option value="CC">CÉDULA</option>
+                            <option value="CE">EXTRANJERÍA</option>
+                        </select>
+                    </div>
+                    <div><label class="lbl-orion">Documento</label><input type="text" id="documento" class="input-orion"></div>
+                    <div><label class="lbl-orion">Teléfono 1</label><input type="text" id="telefono1" class="input-orion"></div>
+                    <div><label class="lbl-orion">País</label><input type="text" id="paisPersona" class="input-orion" value="COLOMBIA"></div>
+                    <div><label class="lbl-orion">Departamento</label><input type="text" id="departamentoPersona" class="input-orion"></div>
+                    <div><label class="lbl-orion">Ciudad</label><input type="text" id="ciudadPersona" class="input-orion"></div>
+                    <div class="col-span-2"><label class="lbl-orion">Dirección</label><input type="text" id="direccion" class="input-orion"></div>
+                    <div class="col-span-2"><label class="lbl-orion">Fecha Nacimiento</label><input type="date" id="fechaNacimiento" class="input-orion"></div>
+                    <div class="col-span-2"><label class="lbl-orion">Lugar Nacimiento</label><input type="text" id="lugarNacimiento" class="input-orion"></div>
+                </div>
+            </div>
+            
+            <div class="flex gap-2">
+                <button onclick="switchTab(2)" class="flex-1 bg-gray-600 text-white py-4 rounded-xl">← Volver</button>
+                <button onclick="finalizarCarga()" class="flex-1 bg-green-600 text-white py-4 rounded-xl">✅ FINALIZAR</button>
+            </div>
+
+            <div class="max-w-5xl mx-auto mt-6 bg-black text-green-400 p-4 rounded-xl text-[10px] font-mono">
+            <div class="flex justify-between items-center mb-2">
+                <span class="font-bold text-green-300">🧠 OCR - DATOS RECIBIDOS (DEBUG)</span>
+                <button onclick="limpiarDebugOCR()" class="text-[9px] bg-green-700 text-black px-2 py-1 rounded">
+                    LIMPIAR
+                </button>
+            </div>
+            <pre id="ocr-debug-output" class="overflow-auto max-h-64 whitespace-pre-wrap">
+            Esperando datos OCR...
+                </pre>
+            </div>
+        </div>
+    </main>
+
+
+
+    <!-- JAVASCRIPT --> 
+
+    <script>
+        const socket = io();
+        let imagenesProcesadas = {
+            propiedad: { anverso: false, reverso: false },
+            cedula: { anverso: false, reverso: false },
+            licencia: { anverso: false, reverso: false }
+        };
+
+        function mostrarToast(msg, tipo) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.remove('hidden', 'bg-red-600', 'bg-green-600');
+            toast.classList.add(tipo === 'error' ? 'bg-red-600' : 'bg-green-600');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+
+        }
+
+
+            // Mejorar la captura de fotos
+            function configurarCamara() {
+                // Forzar alta resolución
+                const inputs = document.querySelectorAll('input[type="file"][capture="environment"]');
+                inputs.forEach(input => {
+                    input.setAttribute('accept', 'image/*');
+                    // No podemos forzar resolución, pero sí sugerir
+                });
+            }
+
+
+        function switchTab(n) {
+            [1,2,3].forEach(i => {
+                const tab = document.getElementById('tab'+i);
+                const btn = document.getElementById('btn-tab'+i);
+                if (tab) tab.classList.add('hidden');
+                if (btn) btn.className = 'tab-btn tab-inactive';
+            });
+            const tab = document.getElementById('tab'+n);
+            const btn = document.getElementById('btn-tab'+n);
+            if (tab) tab.classList.remove('hidden');
+            if (btn) btn.className = 'tab-btn tab-active';
+        }
+
+        async function procesarFoto(input, imgId, txtId, tipo, cara) {
+            if (!input.files || !input.files[0]) return;
+            
+            const img = document.getElementById(imgId);
+            const txt = document.getElementById(txtId);
+            const file = input.files[0];
+            
+            // Mostrar vista previa
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                img.src = e.target.result;
+                img.classList.remove('hidden');
+                if (txt) txt.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+            
+            // Mostrar progreso
+            document.getElementById('ocr-progress').classList.remove('hidden');
+            document.getElementById('ocr-status').textContent = 'PROCESANDO ' + tipo.toUpperCase() + ' ' + cara.toUpperCase();
+            document.getElementById('ocr-progress-bar').style.width = '50%';
+            document.getElementById('ocr-detalle').textContent = `Procesando ${cara} de ${tipo}...`;
+            
+            // Enviar al servidor
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('tipo', tipo);
+            formData.append('cara', cara);
+            
+            try {
+                const res = await fetch('/api/ocr', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                document.getElementById('ocr-progress-bar').style.width = '100%';
+                document.getElementById('ocr-status').textContent = 'COMPLETADO';
+                
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data?.error || 'Error procesando OCR');
+                }
+                console.log('Datos OCR recibidos:', data);
+                // Actualizar campos según el tipo
+                if (tipo === 'propiedad') {
+                    actualizarCamposVehiculo(data);
+                    imagenesProcesadas.propiedad[cara] = true;
+                } else if (tipo === 'cedula') {
+                    actualizarCamposPersona(data);
+                    imagenesProcesadas.cedula[cara] = true;
+                }
+                
+                mostrarToast(`✅ ${tipo} (${cara}) procesado`, 'success');
+                
+            } catch (error) {
+                console.error('Error OCR:', error);
+                document.getElementById('ocr-status').textContent = 'ERROR';
+                mostrarToast(`⚠️ Error en ${cara}`, 'error');
+                
+                // Simulación para pruebas
+                if (tipo === 'propiedad') {
+                    document.getElementById('placa').value = "ABC123";
+                    document.getElementById('marca').value = "CHEVROLET";
+                    document.getElementById('vin').value = "9BGKS54W0PG000123";
+                } else if (tipo === 'cedula') {
+                    document.getElementById('nombres').value = "JUAN CARLOS";
+                    document.getElementById('apellidos').value = "PEREZ";
+                    document.getElementById('documento').value = "123456789";
+                }
+            } finally {
+                setTimeout(() => {
+                    document.getElementById('ocr-progress').classList.add('hidden');
+                    document.getElementById('ocr-progress-bar').style.width = '0%';
+                }, 2000);
+            }
+        }
+
+        function actualizarCamposVehiculo(datos) {
+            const mapeo = {
+                'placa': 'placa',
+                'marca': 'marca',
+                'linea': 'linea',
+                'clase': 'clase',
+                'servicio': 'servicio',
+                'licencia': 'numero_licencia',
+                'cilindraje': 'cilindraje',
+                'modelo': 'modelo',
+                'vin': 'numero_vin',
+                'motor': 'numero_motor',
+                'ejes': 'no_ejes',
+                'combustible': 'combustible',
+                'chasis': 'chasis',
+                'llanta': 'ref_llanta',
+                'pais': 'pais',
+                'departamento': 'departamento',
+                'ciudad': 'ciudad',
+                'matricula': 'matricula',
+                'color': 'color_primario',
+                'kilometraje': 'kilometraje',
+                'potencia': 'potencia',
+                'tipo_motor': 'tipo_motor',
+                'carroceria': 'tipo_carroceria',
+                'pax': 'no_pax',
+                'blindado': 'blindado'
+            };
+            
+            Object.entries(mapeo).forEach(([id, key]) => {
+                const input = document.getElementById(id);
+                if (input && datos[key]) {
+                    input.value = datos[key];
+                    input.style.backgroundColor = '#d1fae5';
+                    setTimeout(() => input.style.backgroundColor = '', 2000);
+                }
+            });
+        }
+
+        function actualizarCamposPersona(datos) {
+            const mapeo = {
+                'nombres': 'nombres',
+                'apellidos': 'apellidos',
+                'tipoDoc': 'tipo_doc',
+                'documento': 'documento',
+                'telefono1': 'telefono1',
+                'paisPersona': 'pais',
+                'departamentoPersona': 'departamento',
+                'ciudadPersona': 'ciudad',
+                'direccion': 'direccion',
+                'fechaNacimiento': 'fecha_nacimiento',
+                'lugarNacimiento': 'lugar_nacimiento'
+            };
+
+            if (!datos.telefono1 && datos.telefono) {
+                datos.telefono1 = datos.telefono;
+            }
+            
+            Object.entries(mapeo).forEach(([id, key]) => {
+                const input = document.getElementById(id);
+                if (input && datos[key]) {
+                    input.value = datos[key];
+                    input.style.backgroundColor = '#d1fae5';
+                    setTimeout(() => input.style.backgroundColor = '', 2000);
+                }
+            });
+        }
+
+            
+
+            // Llamar al cargar
+            configurarCamara();
+
+        function irATabVehiculo() { 
+            if (imagenesProcesadas.propiedad.anverso || imagenesProcesadas.cedula.anverso) {
+                switchTab(2);
+            } else {
+                mostrarToast('Toma al menos una foto primero', 'error');
+            }
+        }
+
+        function obtenerValor(id) {
+            return document.getElementById(id)?.value?.trim() || '';
+        }
+
+        function recolectarDatosFormulario() {
+            return {
+                vehiculo: {
+                    placa: obtenerValor('placa'),
+                    marca: obtenerValor('marca'),
+                    linea: obtenerValor('linea'),
+                    clase: obtenerValor('clase'),
+                    servicio: obtenerValor('servicio'),
+                    numero_licencia: obtenerValor('licencia'),
+                    cilindraje: obtenerValor('cilindraje'),
+                    modelo: obtenerValor('modelo'),
+                    numero_vin: obtenerValor('vin'),
+                    numero_motor: obtenerValor('motor'),
+                    no_ejes: obtenerValor('ejes'),
+                    combustible: obtenerValor('combustible'),
+                    chasis: obtenerValor('chasis'),
+                    ref_llanta: obtenerValor('llanta'),
+                    pais: obtenerValor('pais'),
+                    departamento: obtenerValor('departamento'),
+                    ciudad: obtenerValor('ciudad'),
+                    matricula: obtenerValor('matricula'),
+                    color_primario: obtenerValor('color'),
+                    kilometraje: obtenerValor('kilometraje'),
+                    potencia: obtenerValor('potencia'),
+                    tipo_carroceria: obtenerValor('carroceria'),
+                    no_pax: obtenerValor('pax'),
+                    blindado: obtenerValor('blindado')
+                },
+                persona: {
+                    nombres: obtenerValor('nombres'),
+                    apellidos: obtenerValor('apellidos'),
+                    tipo_doc: obtenerValor('tipoDoc'),
+                    documento: obtenerValor('documento'),
+                    telefono1: obtenerValor('telefono1'),
+                    pais: obtenerValor('paisPersona'),
+                    departamento: obtenerValor('departamentoPersona'),
+                    ciudad: obtenerValor('ciudadPersona'),
+                    direccion: obtenerValor('direccion'),
+                    fecha_nacimiento: obtenerValor('fechaNacimiento'),
+                    lugar_nacimiento: obtenerValor('lugarNacimiento')
+                }
+            };
+        }
+
+        async function finalizarCarga() {
+            const payload = recolectarDatosFormulario();
+
+            try {
+                const res = await fetch('/api/confirmar-datos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) throw new Error('No se pudo confirmar la carga');
+
+                mostrarToast('✅ Datos confirmados y enviados a Validador', 'success');
+                switchTab(1);
+            } catch (error) {
+                console.error('Error al confirmar datos:', error);
+                mostrarToast('⚠️ No se pudo confirmar la carga', 'error');
+            }
+        }
+
+        function reiniciarCaptura() { 
+            if(confirm('¿Reiniciar toda la captura?')) location.reload(); 
+        }
+
+        // Mantener operador sincronizado con backend/otros clientes
+        socket.on('datos_iniciales', (datos) => {
+            if (datos?.vehiculo) actualizarCamposVehiculo(datos.vehiculo);
+            if (datos?.persona) actualizarCamposPersona(datos.persona);
+        });
+
+        socket.on('datos_actualizados', (datos) => {
+            if (datos?.vehiculo) actualizarCamposVehiculo(datos.vehiculo);
+            if (datos?.persona) actualizarCamposPersona(datos.persona);
+        });
+
+        socket.on('ocr_completado', (payload) => {
+            if (payload?.tipo === 'propiedad') actualizarCamposVehiculo(payload.datos || {});
+            if (payload?.tipo === 'cedula') actualizarCamposPersona(payload.datos || {});
+        });
+
+        fetch('/api/ultimos-datos')
+            .then(res => res.json())
+            .then((datos) => {
+                if (datos?.vehiculo) actualizarCamposVehiculo(datos.vehiculo);
+                if (datos?.persona) actualizarCamposPersona(datos.persona);
+            })
+            .catch(() => {});
+
+        // Socket.io
+        socket.on('connect', () => {
+            document.getElementById('connection-status').innerHTML = '🟢 ONLINE';
+        });
+
+        socket.on('disconnect', () => {
+            document.getElementById('connection-status').innerHTML = '🔴 OFFLINE';
+
+        });
+
+        function mostrarDebugOCR(datos, tipo, cara) {
+        const panel = document.getElementById('ocr-debug-output');
+        const timestamp = new Date().toLocaleTimeString();
+
+        panel.textContent =
+        `[${timestamp}] OCR ${tipo.toUpperCase()} - ${cara.toUpperCase()}
+        --------------------------------------------------
+        ${JSON.stringify(datos, null, 2)}
+
+        `;
+            }
+
+            function limpiarDebugOCR() {
+                document.getElementById('ocr-debug-output').textContent = 'Esperando datos OCR...';
+            }
+
+            
+        </script>
+</body>
+</html>

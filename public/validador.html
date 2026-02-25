@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VALIDADOR - Revisión OCR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        .input-orion {
+            @apply w-full p-1.5 border border-gray-300 rounded text-[11px] bg-gray-100 font-semibold text-gray-800 uppercase cursor-pointer;
+        }
+        .lbl-orion {
+            @apply block text-[9px] font-bold text-blue-900 uppercase mb-0.5;
+        }
+        .tab-btn {
+            @apply flex-1 py-3 text-xs font-black uppercase tracking-wider transition-all border-b-4;
+        }
+        .tab-active {
+            @apply border-green-700 text-green-700 bg-green-50;
+        }
+        .tab-inactive {
+            @apply border-transparent text-gray-400 bg-white;
+        }
+        .copy-btn {
+            @apply absolute right-1 top-1 bg-white rounded px-1.5 py-0.5 text-[8px] font-bold text-blue-600 border border-blue-200 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer;
+        }
+        .input-container {
+            @apply relative group;
+        }
+        .badge-validator {
+            @apply bg-green-600 text-white text-[8px] px-2 py-1 rounded-full;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+    <header class="bg-green-800 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="flex justify-between items-center max-w-5xl mx-auto">
+            <div class="flex items-center gap-3">
+                <span class="bg-green-600 text-white text-xs px-2 py-1 rounded-full">✓ VALIDADOR</span>
+                <h1 class="font-black text-xl italic tracking-tighter">ML SOCETY <span class="text-green-300 font-light">REVISIÓN</span></h1>
+            </div>
+            <div>
+                <span id="connection-status" class="text-[8px] bg-green-600 px-2 py-1 rounded-full">🟢 CONECTADO</span>
+            </div>
+        </div>
+    </header>
+
+    <nav class="flex sticky top-[64px] z-40 shadow-sm border-b border-gray-200 bg-white">
+        <button id="btn-tab1" onclick="switchTab(1)" class="tab-btn tab-active">📋 VER VEHÍCULO</button>
+        <button id="btn-tab2" onclick="switchTab(2)" class="tab-btn tab-inactive">👤 VER PERSONA</button>
+    </nav>
+
+    <main class="max-w-5xl mx-auto p-4 pb-24">
+        <!-- Mensaje de sincronización -->
+        <div class="bg-green-50 border border-green-200 p-3 rounded-xl mb-4 text-center">
+            <span class="text-[10px] font-bold text-green-800">
+                🔄 DATOS SINCRONIZADOS EN TIEMPO REAL CON EL OPERADOR
+            </span>
+        </div>
+
+        <!-- TAB 1: Datos Vehículo (SOLO LECTURA + COPIA) -->
+        <div id="tab1" class="space-y-4">
+            <div class="bg-white p-4 rounded-xl shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-green-700 font-black text-[11px] uppercase">Vehículo - Modo Validación</h2>
+                    <button onclick="copiarTodoVehiculo()" class="text-[10px] bg-green-600 text-white px-3 py-1 rounded-full font-bold">
+                        📋 COPIAR TODO
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <!-- Todos los campos con botón de copia individual -->
+                    <div class="col-span-2 md:col-span-1 input-container group">
+                        <label class="lbl-orion">Placa</label>
+                        <input type="text" id="v-placa" class="input-orion" readonly onclick="copiarCampo(this)">
+                        <span class="copy-btn" onclick="copiarCampo('v-placa')">📋 Copiar</span>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Marca</label>
+                        <input type="text" id="v-marca" class="input-orion" readonly onclick="copiarCampo(this)">
+                        <span class="copy-btn" onclick="copiarCampo('v-marca')">📋</span>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Línea</label>
+                        <input type="text" id="v-linea" class="input-orion" readonly onclick="copiarCampo(this)">
+                        <span class="copy-btn" onclick="copiarCampo('v-linea')">📋</span>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Clase</label>
+                        <input type="text" id="v-clase" class="input-orion" readonly onclick="copiarCampo(this)">
+                        <span class="copy-btn" onclick="copiarCampo('v-clase')">📋</span>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Servicio</label>
+                        <input type="text" id="v-servicio" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">No. Licencia</label>
+                        <input type="text" id="v-licencia" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Cilindraje</label>
+                        <input type="text" id="v-cilindraje" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Modelo</label>
+                        <input type="text" id="v-modelo" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="col-span-2 input-container group">
+                        <label class="lbl-orion">Número VIN</label>
+                        <input type="text" id="v-vin" class="input-orion font-mono" readonly>
+                        <span class="copy-btn" onclick="copiarCampo('v-vin')">📋 Copiar VIN</span>
+                    </div>
+                    
+                    <div class="col-span-2 input-container group">
+                        <label class="lbl-orion">Número Motor</label>
+                        <input type="text" id="v-motor" class="input-orion font-mono" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">No. Ejes</label>
+                        <input type="text" id="v-ejes" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Combustible</label>
+                        <input type="text" id="v-combustible" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="col-span-2 input-container group">
+                        <label class="lbl-orion">Chasis</label>
+                        <input type="text" id="v-chasis" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Ref Llanta</label>
+                        <input type="text" id="v-llanta" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">País</label>
+                        <input type="text" id="v-pais" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Departamento</label>
+                        <input type="text" id="v-depto" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Ciudad</label>
+                        <input type="text" id="v-ciudad" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Matrícula</label>
+                        <input type="text" id="v-matricula" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Color</label>
+                        <input type="text" id="v-color" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Kilometraje</label>
+                        <input type="text" id="v-kilometraje" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Potencia</label>
+                        <input type="text" id="v-potencia" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Tipo Motor</label>
+                        <input type="text" id="v-tipo-motor" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Carrocería</label>
+                        <input type="text" id="v-carroceria" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">No. Pax</label>
+                        <input type="text" id="v-pax" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Blindado</label>
+                        <input type="text" id="v-blindado" class="input-orion" readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Datos Persona (SOLO LECTURA + COPIA) -->
+        <div id="tab2" class="hidden space-y-4">
+            <div class="bg-white p-4 rounded-xl shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-green-700 font-black text-[11px] uppercase">Persona - Modo Validación</h2>
+                    <button onclick="copiarTodoPersona()" class="text-[10px] bg-green-600 text-white px-3 py-1 rounded-full font-bold">
+                        📋 COPIAR TODO
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="col-span-2 input-container group">
+                        <label class="lbl-orion">Nombres</label>
+                        <input type="text" id="p-nombre" class="input-orion" readonly>
+                        <span class="copy-btn" onclick="copiarCampo('p-nombre')">📋</span>
+                    </div>
+                    
+                    <div class="col-span-2 input-container group">
+                        <label class="lbl-orion">Apellidos</label>
+                        <input type="text" id="p-apellido" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Tipo Doc</label>
+                        <input type="text" id="p-tipo-doc" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Documento</label>
+                        <input type="text" id="p-doc" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Teléfono</label>
+                        <input type="text" id="p-telefono" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">País</label>
+                        <input type="text" id="p-pais" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Departamento</label>
+                        <input type="text" id="p-depto" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="input-container group">
+                        <label class="lbl-orion">Ciudad</label>
+                        <input type="text" id="p-ciudad" class="input-orion" readonly>
+                    </div>
+                    
+                    <div class="col-span-2 input-container group">
+                        <label class="lbl-orion">Dirección</label>
+                        <input type="text" id="p-direccion" class="input-orion" readonly>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de estado -->
+        <div class="fixed bottom-4 right-4 bg-white shadow-lg rounded-full px-4 py-2 text-[10px] font-bold">
+            <span id="sync-status">👁️ VALIDADOR ACTIVO</span>
+        </div>
+    </main>
+
+    <script>
+        const socket = io();
+        
+        // Mapeos backend -> inputs de validador
+        const mapeoVehiculo = {
+            placa: 'v-placa',
+            marca: 'v-marca',
+            linea: 'v-linea',
+            clase: 'v-clase',
+            servicio: 'v-servicio',
+            numero_licencia: 'v-licencia',
+            cilindraje: 'v-cilindraje',
+            modelo: 'v-modelo',
+            numero_vin: 'v-vin',
+            numero_motor: 'v-motor',
+            no_ejes: 'v-ejes',
+            combustible: 'v-combustible',
+            chasis: 'v-chasis',
+            ref_llanta: 'v-llanta',
+            pais: 'v-pais',
+            departamento: 'v-depto',
+            ciudad: 'v-ciudad',
+            matricula: 'v-matricula',
+            color_primario: 'v-color',
+            kilometraje: 'v-kilometraje',
+            potencia: 'v-potencia',
+            tipo_motor: 'v-tipo-motor',
+            tipo_carroceria: 'v-carroceria',
+            no_pax: 'v-pax',
+            blindado: 'v-blindado'
+        };
+
+        const mapeoPersona = {
+            nombres: 'p-nombre',
+            apellidos: 'p-apellido',
+            tipo_doc: 'p-tipo-doc',
+            documento: 'p-doc',
+            telefono1: 'p-telefono',
+            telefono: 'p-telefono',
+            pais: 'p-pais',
+            departamento: 'p-depto',
+            ciudad: 'p-ciudad',
+            direccion: 'p-direccion'
+        };
+
+        function setCampos(datos, mapeo) {
+            Object.entries(mapeo).forEach(([key, targetId]) => {
+                const value = datos?.[key];
+                if (value === undefined || value === null || value === '') return;
+                const input = document.getElementById(targetId);
+                if (input) input.value = value;
+            });
+        }
+
+        // Recibir actualizaciones en tiempo real
+        socket.on('datos_iniciales', (datos) => {
+            actualizarCampos(datos);
+        });
+
+        socket.on('datos_actualizados', (datos) => {
+            actualizarCampos(datos);
+        });
+
+        socket.on('ocr_completado', (data) => {
+            if (data.tipo === 'propiedad') {
+                setCampos(data.datos, mapeoVehiculo);
+            } else if (data.tipo === 'cedula') {
+                setCampos(data.datos, mapeoPersona);
+            }
+        });
+
+        function actualizarCampos(datos) {
+            setCampos(datos.vehiculo || {}, mapeoVehiculo);
+            setCampos(datos.persona || {}, mapeoPersona);
+        }
+
+        function copiarCampo(elemento) {
+            let input;
+            if (typeof elemento === 'string') {
+                input = document.getElementById(elemento);
+            } else {
+                input = elemento;
+            }
+            
+            input.select();
+            document.execCommand('copy');
+            
+            // Feedback visual
+            const originalBg = input.style.backgroundColor;
+            input.style.backgroundColor = '#d1fae5';
+            setTimeout(() => input.style.backgroundColor = originalBg, 200);
+            
+            mostrarNotificacion('✓ Copiado al portapapeles');
+        }
+
+        function copiarTodoVehiculo() {
+            const campos = [
+                'v-placa', 'v-marca', 'v-linea', 'v-clase', 'v-servicio',
+                'v-licencia', 'v-cilindraje', 'v-modelo', 'v-vin', 'v-motor',
+                'v-color', 'v-pais', 'v-depto', 'v-ciudad'
+            ];
+            
+            let texto = '';
+            campos.forEach(id => {
+                const input = document.getElementById(id);
+                if (input && input.value) {
+                    const label = input.parentElement.querySelector('.lbl-orion')?.textContent || id;
+                    texto += `${label}: ${input.value}\n`;
+                }
+            });
+            
+            navigator.clipboard.writeText(texto);
+            mostrarNotificacion('✓ Datos vehículo copiados');
+        }
+
+        function copiarTodoPersona() {
+            const campos = [
+                'p-nombre', 'p-apellido', 'p-tipo-doc', 'p-doc',
+                'p-telefono', 'p-direccion', 'p-ciudad'
+            ];
+            
+            let texto = '';
+            campos.forEach(id => {
+                const input = document.getElementById(id);
+                if (input && input.value) {
+                    const label = input.parentElement.querySelector('.lbl-orion')?.textContent || id;
+                    texto += `${label}: ${input.value}\n`;
+                }
+            });
+            
+            navigator.clipboard.writeText(texto);
+            mostrarNotificacion('✓ Datos persona copiados');
+        }
+
+        function mostrarNotificacion(msg) {
+            const status = document.getElementById('sync-status');
+            const original = status.textContent;
+            status.textContent = msg;
+            setTimeout(() => status.textContent = original, 1500);
+        }
+
+        function switchTab(n) {
+            [1,2].forEach(i => {
+                document.getElementById('tab'+i).classList.add('hidden');
+                document.getElementById('btn-tab'+i).className = 'tab-btn tab-inactive';
+            });
+            document.getElementById('tab'+n).classList.remove('hidden');
+            document.getElementById('btn-tab'+n).className = 'tab-btn tab-active';
+        }
+
+        // Cargar datos iniciales
+        fetch('/api/ultimos-datos')
+            .then(res => res.json())
+            .then(data => actualizarCampos(data));
+    </script>
+</body>
+</html>
