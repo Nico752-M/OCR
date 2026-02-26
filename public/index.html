@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>OCR Documentos</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<h1>📄 Procesamiento de Documentos</h1>
+
+<!-- ================= DOCUMENTOS ================= -->
+<section>
+  <h2>🪪 Cédula</h2>
+  <input type="file" id="cedula_frontal" accept="image/*" capture="environment">
+  <input type="file" id="cedula_reverso" accept="image/*" capture="environment">
+</section>
+
+<section>
+  <h2>🚘 Licencia</h2>
+  <input type="file" id="licencia_frontal" accept="image/*" capture="environment">
+</section>
+
+<section>
+  <h2>📘 Tarjeta de Propiedad</h2>
+  <input type="file" id="tarjeta_frontal" accept="image/*" capture="environment">
+</section>
+
+<button onclick="procesar()">📸 Procesar Documentos</button>
+
+<hr>
+
+<!-- ================= PERSONA ================= -->
+<h2>👤 Info Persona</h2>
+<input id="persona_documento" placeholder="Numero">
+<input id="Tipo_documento" placeholder="Tipo documento">
+<input id="persona_nombres" placeholder="Nombres">
+<input id="persona_apellidos" placeholder="Apellidos">
+<input id="persona_fecha_nacimiento" placeholder="Fecha nacimiento">
+<input id="persona_lugar_nacimiento" placeholder="Lugar nacimiento">
+<input id="persona_fecha_expedicion" placeholder="Fecha expedición">
+<input id="persona_lugar_expedicion" placeholder="Lugar expedición">
+
+<hr>
+
+<!-- ================= VEHÍCULO ================= -->
+<h2>🚗 Info Vehículo</h2>
+<input id="vehiculo_identificacion" placeholder="No">
+<input id="vehiculo_placa" placeholder="Placa">
+<input id="vehiculo_marca" placeholder="Marca">
+<input id="vehiculo_linea" placeholder="Línea">
+<input id="vehiculo_modelo" placeholder="Modelo">
+<input id="vehiculo_cilindraje" placeholder="Cilindrada CC">
+<input id="vehiculo_color" placeholder="Color">
+<input id="vehiculo_servicio" placeholder="Servicio">
+<input id="vehiculo_clase" placeholder="Clase de vehiculo">
+<input id="vehiculo_tipo_carroceria" placeholder="Tipo carroceria">
+<input id="vehiculo_combustible" placeholder="Combustible">
+<input id="vehiculo_capacidad" placeholder="Capacidad Kg/Psj">
+<input id="vehiculo_motor" placeholder="Número motor">
+<input id="vehiculo_vin" placeholder="VIN">
+<input id="vehiculo_serie" placeholder="Numero de serie">
+<input id="vehiculo_chasis" placeholder="Numero de Chasis">
+
+<script src="script.js"></script>
+</body>
+</html>
