@@ -123,28 +123,146 @@ def buscar_valor(ocr, etiqueta):
 
     return ""
 
+    
+
+ETIQUETAS_TARJETA = {
+    "identificacion": ["IDENTIFICACION"],
+    "placa": ["PLACA"],
+    "marca": ["MARCA"],
+    "linea": ["LINEA"],
+    "modelo": ["MODELO"],
+    "cilindraje": ["CILINDRAJE", "CILINDR"],
+    "color": ["COLOR"],
+    "servicio": ["SERVICIO"],
+    "clase": ["CLASE"],
+    "capacidad": ["CAPACIDAD"],
+    "motor": ["MOTOR"],
+    "vin": ["VIN"],
+    "chasis": ["CHASIS"],
+    "serie": ["SERIE"]
+}
+
+def detectar_etiquetas(ocr, etiquetas):
+    encontradas = []
+
+    for campo, keys in etiquetas.items():
+        for r in ocr:
+            if any(k in r["texto"] for k in keys):
+                encontradas.append({
+                    "campo": campo,
+                    "x": r["x"],
+                    "y": r["y"],
+                    "texto": r["texto"]
+                })
+    return encontradas
+
+def distancia(a, b):
+    return abs(a["x"] - b["x"]) + abs(a["y"] - b["y"])
+
+def asignar_valores(ocr, etiquetas_detectadas):
+    resultado = {}
+
+    for e in etiquetas_detectadas:
+        candidatos = []
+
+        for r in ocr:
+            if r["texto"] == e["texto"]:
+                continue
+
+            # solo texto cercano
+            if (
+                r["y"] > e["y"] and
+                r["y"] - e["y"] < 120 and
+                abs(r["x"] - e["x"]) < 400
+            ):
+                candidatos.append(r)
+
+        if candidatos:
+            mejor = min(candidatos, key=lambda r: distancia(e, r))
+            resultado[e["campo"]] = limpiar_texto(mejor["texto"])
+
+    return resultado
+def limpiar_texto(txt):
+    basura = [
+        "MARCA", "MODELO", "PLACA", "SERVICIO", "CLASE",
+        "CAPACIDAD", "COLOR", "CILINDRAJE", "VIN",
+        "CHASIS", "SERIE", "IDENTIFICACION"
+    ]
+
+    txt = txt.upper()
+
+    for b in basura:
+        txt = txt.replace(b, "")
+
+    # quitar caracteres raros
+    txt = re.sub(r"[^A-Z0-9\-\. ]", "", txt)
+
+    # normalizar espacios
+    txt = re.sub(r"\s{2,}", " ", txt).strip()
+
+    return txt
+
+    txt = txt.upper()
+    for b in basura:
+        txt = txt.replace(b, "")
+
+    return re.sub(r"\s{2,}", " ", txt).strip()
+
+def extraer_tarjeta_inteligente(ocr):
+    ocr = ordenar_ocr(ocr)
+
+    etiquetas_detectadas = detectar_etiquetas(ocr, ETIQUETAS_TARJETA)
+    valores = asignar_valores(ocr, etiquetas_detectadas)
+
+    # garantizar campos vacíos
+    for k in ETIQUETAS_TARJETA:
+        valores.setdefault(k, "")
+
+    return valores
+
+def normalizar_codigo(txt):
+    """
+    Normaliza VIN / CHASIS:
+    - Mayúsculas
+    - Solo A-Z y 0-9
+    - Quita ruido OCR
+    """
+    if not txt:
+        return ""
+
+    txt = txt.upper()
+    txt = re.sub(r"[^A-Z0-9]", "", txt)
+
+    return txt
+
+def reconciliar_vin_chasis(data):
+    vin = normalizar_codigo(data.get("vin", ""))
+    chasis = normalizar_codigo(data.get("chasis", ""))
+
+    # si ambos existen
+    if vin and chasis:
+        # si uno es substring del otro → usar el más largo
+        if vin in chasis:
+            final = chasis
+        elif chasis in vin:
+            final = vin
+        else:
+            # escoger el que tenga longitud típica VIN (17)
+            final = vin if len(vin) >= len(chasis) else chasis
+
+    # si solo uno existe
+    else:
+        final = vin or chasis
+
+    data["vin"] = final
+    data["chasis"] = final
+
+    return data
 # =========================
 # EXTRACCIÓN DOCUMENTOS
 # =========================
 
-def extraer_tarjeta(ocr):
-    return {
-        "identificacion": buscar_valor(ocr, "IDENTIFICACION"),
-        "numero": buscar_valor(ocr, "LICENCIA"),
-        "placa": buscar_valor(ocr, "PLACA"),
-        "marca": buscar_valor(ocr, "MARCA"),
-        "linea": buscar_valor(ocr, "LINEA"),
-        "modelo": buscar_valor(ocr, "MODELO"),
-        "cilindraje": buscar_valor(ocr, "CILINDR"),
-        "color": buscar_valor(ocr, "COLOR"),
-        "servicio": buscar_valor(ocr, "SERVICIO"),
-        "clase": buscar_valor(ocr, "CLASE"),
-        "capacidad": buscar_valor(ocr, "CAPACIDAD"),
-        "motor": buscar_valor(ocr, "MOTOR"),
-        "vin": buscar_valor(ocr, "VIN"),
-        "chasis": buscar_valor(ocr, "CHASIS"),
-        "serie": buscar_valor(ocr, "SERIE")
-    }
+
 
 def extraer_cedula(ocr):
     return {
@@ -195,8 +313,9 @@ async def ocr(
         print(r)
     print("======================")
 
-    tarjeta_data = extraer_tarjeta(ocr_tarjeta)
-
+    tarjeta_data = extraer_tarjeta_inteligente(ocr_tarjeta)
+    tarjeta_data = reconciliar_vin_chasis(tarjeta_data)
+    
     print("\n===== TARJETA EXTRAÍDA =====")
     print(tarjeta_data)
     print("============================")
